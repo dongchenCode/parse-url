@@ -15,6 +15,7 @@ class ParseResult:
     author: str
     images: list[str] = field(default_factory=list)
     video_url: Optional[str] = None
+    audio_url: Optional[str] = None
     cover_url: Optional[str] = None
     author_avatar: Optional[str] = None
 

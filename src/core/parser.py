@@ -24,7 +24,14 @@ class Parser:
 
     async def parse(self, url: str) -> ParseResult:
         """解析单个链接"""
-        # 预处理：跟随重定向
+        # 先尝试直接匹配原始 URL（短链情况）
+        adapter = self._find_adapter(url)
+        if adapter:
+            # 短链仍需重定向拿到真实 URL 再解析
+            real_url = await follow_redirect(url)
+            return await adapter.parse(real_url)
+
+        # 非短链：先重定向再匹配
         real_url = await follow_redirect(url)
         adapter = self._find_adapter(real_url)
         if adapter is None:
