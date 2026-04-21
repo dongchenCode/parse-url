@@ -11,58 +11,34 @@
 | 快手 | `https://v.kuaishou.com/xxx` | 视频 / 图集 |
 | 小红书 | `https://www.xiaohongshu.com/discovery/item/xxx` | 图文笔记 / 视频 |
 
-## 功能特性
-
-- 粘贴分享链接，自动识别平台并解析
-- 提取标题、作者、描述等文案信息
-- 下载无水印图片（小红书图集、抖音图文等）
-- 下载视频文件（抖音、快手、B站等）
-- 视频语音转文字（基于 MLX-Whisper，Apple Silicon Metal 加速）
-- 支持批量解析（多个链接一次处理）
-- 提供命令行工具 & RESTful API 服务
-
-## 前置条件
-
-- Python >= 3.10
-- [uv](https://docs.astral.sh/uv/)（Python 包管理工具）
-- ffmpeg（语音转文字功能需要）
+## 安装
 
 ```bash
-# 安装 uv
+# 前置条件：Python >= 3.10, uv, ffmpeg（语音转文字需要）
+brew install ffmpeg
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 安装 ffmpeg
-brew install ffmpeg
-```
-
-## 快速开始
-
-```bash
-# 克隆项目
-git clone <repo-url>
-cd parse-url
-
-# 安装依赖
+# 克隆并安装依赖
+git clone <repo-url> && cd parse-url
 uv sync
 ```
 
-### 命令行使用
+## 使用
+
+### 命令行
 
 ```bash
-# 解析单个链接（查看信息）
+# 解析链接（查看信息）
 parse-url "https://v.douyin.com/xxx"
 
-# 解析并下载媒体文件
+# 解析并下载
 parse-url "https://v.douyin.com/xxx" --download
 
-# 下载并生成语音转文字
+# 下载并语音转文字
 parse-url "https://v.douyin.com/xxx" -d --transcribe
 
-# 指定模型和字幕格式
+# 指定模型和输出格式
 parse-url "https://v.douyin.com/xxx" -d --transcribe --model base --format srt
-
-# 指定输出目录
-parse-url "https://v.douyin.com/xxx" -d -o ./downloads
 
 # 批量解析（从文件读取链接）
 parse-url --file links.txt -d
@@ -71,19 +47,14 @@ parse-url --file links.txt -d
 ### API 服务
 
 ```bash
-# 开发模式（热重载）
 uv run uvicorn src.server:app --reload --port 8000
-
-# 生产模式
-uv run uvicorn src.server:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-启动后访问：
-- API 服务: `http://localhost:8000`
-- 交互式文档 (Swagger): `http://localhost:8000/docs`
-- 备用文档 (ReDoc): `http://localhost:8000/redoc`
+启动后访问 `http://localhost:8000/docs` 查看交互式 API 文档。
 
-## API 接口
+## API 概览
+
+所有接口返回统一格式 `{"code": 0, "message": "success", "data": {...}}`。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
@@ -97,62 +68,60 @@ uv run uvicorn src.server:app --host 0.0.0.0 --port 8000 --workers 4
 | GET | `/api/platforms` | 查询支持的平台 |
 | GET | `/api/models` | 查询可用的语音模型 |
 
-所有接口返回统一格式：
+### 错误码
 
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": { ... }
-}
-```
+| 错误码 | 含义 |
+|-------|------|
+| 0 | 成功 |
+| 40001 | 链接格式无效 |
+| 40002 | 平台暂不支持 |
+| 40003 | 解析失败 |
+| 40004 | 语音转写失败 |
+| 40401 | 任务不存在 |
+| 50001 | 服务内部错误 |
 
-详细接口文档请参见 [ParseURL.md](./ParseURL.md) 中的 API 部分。
+## 语音转文字模型
 
-## 技术栈
+| 模型 | 内存占用 | 速度 | 适用场景 |
+|------|---------|------|---------|
+| `tiny` | ~150MB | 最快 | 快速预览 |
+| `base` | ~210MB | 快 | 日常使用（默认） |
+| `small` | ~540MB | 中等 | 精度与速度平衡 |
+| `medium` | ~1.5GB | 慢 | 高精度需求 |
+| `large-v3` | ~2.9GB | 最慢 | 最高精度 |
+| `large-v3-turbo` | ~1.5GB | 较快 | 大模型精度 + 更快速度 |
 
-- **语言**: Python >= 3.10
-- **Web 框架**: FastAPI + Uvicorn
-- **HTTP 客户端**: httpx
-- **HTML 解析**: BeautifulSoup4
-- **语音转文字**: MLX-Whisper（Apple MLX 框架，Metal GPU 加速）
-- **音视频处理**: ffmpeg
-- **CLI**: click + rich
-- **包管理**: uv
+> 首次使用时模型会自动从 HuggingFace 下载，需要 Apple Silicon (M1+) 以获得 Metal GPU 加速。
 
 ## 项目结构
 
 ```
-parse-url/
-├── pyproject.toml
-├── src/
-│   ├── cli.py                # CLI 入口
-│   ├── server.py             # API 服务入口
-│   ├── core/
-│   │   ├── parser.py         # 解析调度器
-│   │   ├── downloader.py     # 通用下载器
-│   │   └── transcriber.py    # 语音转文字
-│   ├── adapters/
-│   │   ├── base.py           # 适配器基类
-│   │   ├── douyin.py         # 抖音
-│   │   ├── bilibili.py       # 哔哩哔哩
-│   │   ├── kuaishou.py       # 快手
-│   │   └── xiaohongshu.py    # 小红书
-│   ├── api/
-│   │   ├── routes.py         # 路由定义
-│   │   ├── schemas.py        # 请求/响应模型
-│   │   └── errors.py         # 异常处理
-│   └── utils/
-│       ├── http.py           # HTTP 请求封装
-│       ├── link.py           # 链接处理工具
-│       └── file.py           # 文件工具
-└── output/                   # 默认下载目录
+src/
+├── cli.py                 # CLI 入口（click + rich）
+├── server.py              # FastAPI 服务入口
+├── core/
+│   ├── parser.py          # 解析调度器
+│   ├── downloader.py      # 通用下载器（支持 DASH 音视频合并）
+│   └── transcriber.py     # 语音转文字（ffmpeg + MLX-Whisper）
+├── adapters/
+│   ├── base.py            # 适配器基类（ParseResult + BaseAdapter）
+│   ├── douyin.py          # 抖音
+│   ├── bilibili.py        # 哔哩哔哩
+│   ├── kuaishou.py        # 快手
+│   └── xiaohongshu.py     # 小红书
+├── api/
+│   ├── routes.py          # 路由定义
+│   ├── schemas.py         # 请求/响应模型
+│   └── errors.py          # 异常处理
+└── utils/
+    ├── http.py             # HTTP 客户端封装（重试、UA）
+    ├── link.py             # 链接处理（短链解析、平台识别）
+    └── file.py             # 文件工具（命名、去重）
 ```
 
 ## 注意事项
 
-- 本项目仅供学习交流使用，请勿用于商业用途
-- 语音转文字需要 Apple Silicon（M1 及以上）以获得 Metal GPU 加速
+- 仅供学习交流使用，请勿用于商业用途
 - 部分平台可能需要配置 Cookie 才能解析完整内容
 - 平台接口可能随时变更，适配器需要持续维护
 - 请遵守各平台的内容使用政策
